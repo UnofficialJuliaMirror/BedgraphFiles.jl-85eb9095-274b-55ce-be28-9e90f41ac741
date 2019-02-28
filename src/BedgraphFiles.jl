@@ -102,6 +102,11 @@ function Vector{Bedgraph.Record}(x::T) :: Vector{Bedgraph.Record} where {T} #TOD
     end
 end
 
+function Vector{Bedgraph.Record}(v::Vector{T}) :: Vector{Bedgraph.Record} where T #TODO: consider formalising Records function in bedgraph (e.g. Bedgraph.Records, Bedgraph.Bedgraph.Records) that returns Vector{Bedgraph.Record}.
+    #Note: this method was added to avoid ambiguity with (::Type{Array{T,N}})(x::AbstractArray{S,N}) where {T, N, S} in Base at array.jl:482
+    return convert(Vector{Bedgraph.Record}, v)
+end
+
 function save(file::BedgraphFileFormat, header::Bedgraph.BedgraphHeader, records::Vector{Bedgraph.Record}) :: Vector{Bedgraph.Record}
 
     write(file.filename, header, records)
