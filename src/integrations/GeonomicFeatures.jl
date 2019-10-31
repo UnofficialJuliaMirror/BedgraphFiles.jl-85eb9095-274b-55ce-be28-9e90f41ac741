@@ -1,6 +1,8 @@
 @debug "BedgraphFiles loading GenomicFeatures integration."
 
-function Base.convert(::Type{Bedgraph.Record}, interval::GenomicFeatures.Interval{Nothing}, null_value=1) :: Bedgraph.Record
+using .GenomicFeatures
+
+function Base.convert(::Type{Bedgraph.Record}, interval::GenomicFeatures.GenomicInterval{Nothing}, null_value=1) :: Bedgraph.Record
 
     return Bedgraph.Record(
         GenomicFeatures.seqname(interval),
@@ -11,7 +13,7 @@ function Base.convert(::Type{Bedgraph.Record}, interval::GenomicFeatures.Interva
 
 end
 
-function Base.convert(::Type{Bedgraph.Record}, interval::GenomicFeatures.Interval{T}) :: Bedgraph.Record where {T<:Real}
+function Base.convert(::Type{Bedgraph.Record}, interval::GenomicFeatures.GenomicInterval{T}) :: Bedgraph.Record where {T<:Real}
 
     return Bedgraph.Record(
         GenomicFeatures.seqname(interval),
@@ -22,7 +24,7 @@ function Base.convert(::Type{Bedgraph.Record}, interval::GenomicFeatures.Interva
 
 end
 
-function Base.convert(::Type{Vector{Bedgraph.Record}}, data::Union{GenomicFeatures.IntervalCollection{T}, Vector{GenomicFeatures.Interval{T}}}) :: Vector{Bedgraph.Record} where T
+function Base.convert(::Type{Vector{Bedgraph.Record}}, data::Union{GenomicFeatures.GenomicIntervalCollection{I}, AbstractVector{I}}) :: Vector{Bedgraph.Record} where {T,I<:GenomicFeatures.AbstractGenomicInterval{T}}
 
     records = Vector{Bedgraph.Record}(undef, length(data))
 
@@ -36,18 +38,18 @@ function Base.convert(::Type{Vector{Bedgraph.Record}}, data::Union{GenomicFeatur
     return records
 end
 
-function Base.convert(::Type{GenomicFeatures.Interval{Nothing}}, record::Bedgraph.Record) :: GenomicFeatures.Interval{Nothing}
+function Base.convert(::Type{GenomicFeatures.GenomicInterval{Nothing}}, record::Bedgraph.Record) :: GenomicFeatures.GenomicInterval{Nothing}
 
-    return GenomicFeatures.Interval(
+    return GenomicFeatures.GenomicInterval(
         record.chrom,
         record.first,
         record.last
     )
 end
 
-function Base.convert(::Type{GenomicFeatures.Interval{T}}, record::Bedgraph.Record) :: GenomicFeatures.Interval{T} where {T<:Real}
+function Base.convert(::Type{GenomicFeatures.GenomicInterval{T}}, record::Bedgraph.Record) :: GenomicFeatures.GenomicInterval{T} where {T<:Real}
 
-    return GenomicFeatures.Interval(
+    return GenomicFeatures.GenomicInterval(
         record.chrom,
         record.first,
         record.last,
@@ -56,45 +58,61 @@ function Base.convert(::Type{GenomicFeatures.Interval{T}}, record::Bedgraph.Reco
     )
 end
 
-function Base.convert(::Type{Vector{GenomicFeatures.Interval{T}}}, records::Vector{Bedgraph.Record}) :: Vector{GenomicFeatures.Interval{T}} where {T<:Union{Nothing, Real}}
+function Base.convert(::Type{Vector{GenomicFeatures.GenomicInterval{T}}}, records::Vector{Bedgraph.Record}) :: Vector{GenomicFeatures.GenomicInterval{T}} where {T<:Union{Nothing, Real}}
 
-    vec = Vector{GenomicFeatures.Interval{T}}(undef, length(records))
+    vec = Vector{GenomicFeatures.GenomicInterval{T}}(undef, length(records))
 
     for (i, record) in enumerate(records)
-        interval = convert(GenomicFeatures.Interval{T}, record)
+        interval = convert(GenomicFeatures.GenomicInterval{T}, record)
         vec[i] = interval
     end
 
     return vec
 end
 
-function Base.convert(::Type{GenomicFeatures.IntervalCollection{T}}, records::Vector{Bedgraph.Record}) :: GenomicFeatures.IntervalCollection{T} where {T<:Union{Nothing, Real}}
+function Base.convert(::Type{GenomicFeatures.GenomicIntervalCollection{T}}, records::AbstractVector{Bedgraph.Record}) ::GenomicFeatures.GenomicIntervalCollection{GenomicFeatures.GenomicInterval{T}} where {T<:Union{Nothing, Real}}
 
-	vec = convert(Vector{GenomicFeatures.Interval{T}}, records)
-
-    return GenomicFeatures.IntervalCollection{T}(vec)
+    return convert(GenomicFeatures.GenomicIntervalCollection{GenomicFeatures.GenomicInterval{T}}, records)
 end
 
-function Base.convert(::Type{Vector{GenomicFeatures.Interval{T}}}, file::BedgraphFiles.BedgraphFile) :: Vector{GenomicFeatures.Interval{T}} where {T<:Union{Nothing, Real}}
+function Base.convert(::Type{GenomicFeatures.GenomicIntervalCollection{I}}, records::AbstractVector{Bedgraph.Record}) :: GenomicFeatures.GenomicIntervalCollection{I} where {T<:Union{Nothing, Real}, I <:GenomicFeatures.AbstractGenomicInterval{T}}
 
-    records = Vector{Bedgraph.Record}(file)
+	vec = convert(Vector{I}, records) #TODO: make iterator.
 
-    return convert(Vector{GenomicFeatures.Interval{T}}, records)
-
+    return GenomicFeatures.GenomicIntervalCollection{I}(vec)
 end
 
-function Base.convert(::Type{GenomicFeatures.IntervalCollection{T}}, file::BedgraphFiles.BedgraphFile) :: GenomicFeatures.IntervalCollection{T} where {T<:Union{Nothing, Real}}
+function Base.convert(::Type{V}, file::BedgraphFiles.BedgraphFile) :: V where {T<:Union{Nothing, Real},I<:GenomicFeatures.AbstractGenomicInterval{T},V<:AbstractVector{I}}
 
-    vec = convert(Vector{GenomicFeatures.Interval{T}}, file) #Note: we assume data is in the correct order.
+    records = Vector{Bedgraph.Record}(file)#TODO: make iterator.
 
-    return GenomicFeatures.IntervalCollection{T}(vec)
+    return convert(V, records)
 
 end
 
-function GenomicFeatures.IntervalCollection{T}(x) :: GenomicFeatures.IntervalCollection{T} where T
+"Short hand conversion"
+function Base.convert(::Type{GenomicFeatures.GenomicIntervalCollection{T}}, file::BedgraphFiles.BedgraphFile) :: GenomicFeatures.GenomicIntervalCollection{GenomicFeatures.GenomicInterval{T}} where {T<:Union{Nothing, Real}}
+    return convert(GenomicFeatures.GenomicIntervalCollection{GenomicFeatures.GenomicInterval{T}}, file)
+end
 
-	vec = convert(Vector{GenomicFeatures.Interval{T}}, x)
 
-	return GenomicFeatures.IntervalCollection(vec)
+function Base.convert(::Type{GenomicFeatures.GenomicIntervalCollection{I}}, file::BedgraphFiles.BedgraphFile) :: GenomicFeatures.GenomicIntervalCollection{I} where {T<:Union{Nothing, Real}, I<:GenomicFeatures.AbstractGenomicInterval{T}}
+
+    vec = convert(Vector{I}, file) #TODO: pass iterator into GenomicIntervalCollection.
+
+    return GenomicFeatures.GenomicIntervalCollection{I}(vec)
+end
+
+
+"Short hand conversion"
+function GenomicFeatures.GenomicIntervalCollection{T}(data::Union{BedgraphFiles.BedgraphFile, AbstractVector{Bedgraph.Record}}) :: GenomicFeatures.GenomicIntervalCollection{GenomicFeatures.GenomicInterval{T}} where {T<:Union{Nothing, Real}}
+	return GenomicFeatures.GenomicIntervalCollection{GenomicFeatures.GenomicInterval{T}}(data)
+end
+
+function GenomicFeatures.GenomicIntervalCollection{I}(data::Union{BedgraphFiles.BedgraphFile, AbstractVector{Bedgraph.Record}}) :: GenomicFeatures.GenomicIntervalCollection{I} where {T, I<:GenomicFeatures.AbstractGenomicInterval{T}}
+
+	vec = convert(Vector{I}, data) #TODO: pass iterator into GenomicIntervalCollection.
+
+	return GenomicFeatures.GenomicIntervalCollection(vec)
 
 end
